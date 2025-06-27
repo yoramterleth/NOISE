@@ -1,3 +1,7 @@
+""" 
+This file is mostly a copy of the one in seisgo: https://github.com/xtyangpsp/SeisGo. It was only slightly modified to work within this workflow. 
+"""
+
 import os,sys,glob,time
 import obspy
 import scipy
