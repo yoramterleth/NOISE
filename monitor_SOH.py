@@ -1,4 +1,7 @@
-#%% This is a short function to pull and plot the SOH data from a seismic instrument. Allows to verify that the periods of clock drift apparent in the cross correlation stacks are indeed associated with poor data quality.
+"""This is a short function to pull and plot the SOH data from a seismic instrument. Allows to verify that the periods of clock 
+drift apparent in the cross correlation stacks are indeed associated with poor data quality.
+
+Yoram Terleth, March 2024"""
 
 import obspy 
 
