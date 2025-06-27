@@ -1,6 +1,5 @@
 
-''' This script takes local data and transforms it to the correct format, then performs the noise correlations and makes station pairs.
-The results of this script can be investigated with the associated jupyter notebook.
+''' This script takes local data and transforms it to the correct format.
 
 Can be run from the command line, with the station pair and the channel as overriding arguments. An example here:
 
