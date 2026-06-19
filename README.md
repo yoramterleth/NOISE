@@ -6,4 +6,6 @@ The workflow used here is also heavily inspired by one of the working example no
 ## Processing steps for each station pair:
 - Run processing_noise_correlations.py: this loads the data from mseed dayvols, does some preprocessing, and saves it as station pairs in ASDF. Best run from the command line.
 - Run noise_correlation_only.py: performs the cross correlation for the station pairs. Best run from the command line.
-- Run dv_v_script.py Performs the dvv computations, plots figures, and saves csvs for more plotting. Best run as a notebook. 
+- Run dv_v_script.py Performs the dvv computations, plots figures, and saves csvs for more plotting. Best run as a notebook.
+
+## Script_for_main_figure.py can be used to re-create figure 3 in the paper.
