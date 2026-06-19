@@ -1,0 +1,513 @@
+#%% ############################################################################################################
+# PLOT 3 component average WITH VELOCITIES AND THE DVV SNOW CORRECTION. #####################################################
+#########################################################################################################
+###############################################################################################################
+
+import matplotlib.pyplot as plt
+import pickle
+from datetime import datetime
+import numpy as np
+import pandas as pd
+from helpers import load_dvv, load_velocity, seasonal_dvv_correction, average_components
+import scipy.io as sio 
+import matplotlib.dates as mdates
+import matplotlib.gridspec as gridspec
+import matplotlib.patheffects as pe
+
+direc_pickle = './dvv_pickles_final/'
+direc_pickle_Sep25 = './dvv_pickles_SEP_2025/'
+velocity_file_km15 = './timeseries_data/SK_updated_velocity_timeseries_werror_15km.csv'  # New CSV file for velocity data
+velocity_file_km7 =  './timeseries_data/SK_velocity_timeseries_filtered_7km.csv' 
+GHT_file = './GHT_signal_CSVs/SE9_GHT_3-10_data.csv'
+
+
+window_size = 5
+cc_threshold = .5
+
+
+# load some of the principal timeseries
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_powdB'].rolling(window=48*window_size).mean()
+runoff_km15 = pd.read_csv('./timeseries_data/runoff_2025_timeseries_km15.csv',parse_dates=['time'], dayfirst=True)
+runoff_km15['moving_mean'] = runoff_km15['runoff'].rolling(window=8*window_size*3).mean() 
+runoff_km7 = pd.read_csv('./timeseries_data/runoff_2025_timeseries_km7.csv',parse_dates=['time'], dayfirst=True)
+runoff_km7['moving_mean'] = runoff_km7['runoff'].rolling(window=8*window_size*3).mean() 
+runoff_km2 = pd.read_csv('./timeseries_data/runoff_2025_timeseries_km2.csv',parse_dates=['time'], dayfirst=True)
+runoff_km2['moving_mean'] = runoff_km2['runoff'].rolling(window=8*window_size*3).mean() 
+
+# plot settings
+add_dotted_line = True
+correct_seasonal_dvv = True 
+plot_extra_stations = False
+window_size = 10
+cc_threshold = .5
+sz = 24
+fs_title = 26
+ylimdvv = [-1.4,1.4]
+vlims = [0,25]
+ght_lims = [0,4.25e-8] #  [-175,-140] #
+channel ='avg'
+if channel == 'avg':
+     ylimdvv = [-1,1]
+x_axis_limits_all = ('2020-08-01', '2025-09-01') 
+fig, ax = plt.subplots(6,1,figsize=(25,30),sharex=True  ,gridspec_kw={'height_ratios': [5,2,5,2,5,2]})
+fig.subplots_adjust(hspace=0.275)
+
+
+# upper glacier
+# station one 
+sp = 'SW14_SE15_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=15)
+ax[0].scatter(raw_dates, raw_data, s=220, c='tab:blue', alpha=cc_normalized,label=sp)
+if add_dotted_line:
+    s = pd.Series(np.asarray(raw_data, dtype=float),
+              index=pd.to_datetime(raw_dates)).sort_index()
+
+    # locate the one biggest gap and break the line there
+    gap = s.index.to_series().diff()
+    after_gap = gap.idxmax()                      # first point after the largest gap
+    s.loc[after_gap - pd.Timedelta('1ns')] = np.nan
+    s = s.sort_index()
+
+    # ax[0].plot(s.index, s.rolling(window=30).mean(), '--', c='tab:blue', lw=3)
+    ax[0].plot(s.index, s.rolling(window='30D',min_periods=5).mean(),
+        ':', color='k', lw=4,  zorder=10, path_effects=[pe.withStroke(linewidth=8, foreground='white')],label='dv/v trend')
+    
+
+# add second station
+if plot_extra_stations:
+    sp = 'SW14_SE14_s'
+    if channel=='avg':
+        channels =['HHE','HHN','HHZ']
+        raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+    else:
+        data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+    cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+    if correct_seasonal_dvv:
+        raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=14)
+    ax[0].scatter(raw_dates, raw_data, s=220, c='tab:green', alpha=cc_normalized,label=sp)
+
+ax[0].legend(fontsize=14)
+
+# add the 2024-2025 data 
+sp = 'SW14_SE15_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle_Sep25,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle_Sep25,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=15)
+ax[0].scatter(raw_dates, raw_data, s=220, c='tab:blue', alpha=cc_normalized)
+
+if add_dotted_line:
+    s = pd.Series(np.asarray(raw_data, dtype=float),
+              index=pd.to_datetime(raw_dates)).sort_index()
+
+    # locate the one biggest gap and break the line there
+    gap = s.index.to_series().diff()
+    after_gap = gap.idxmax()                      # first point after the largest gap
+    s.loc[after_gap - pd.Timedelta('1ns')] = np.nan
+    s = s.sort_index()
+
+    # ax[0].plot(s.index, s.rolling(window=30).mean(), '--', c='tab:blue', lw=3)
+    ax[0].plot(s.index, s.rolling(window='30D',min_periods=5).mean(),
+        ':', color='k', lw=4,  zorder=10, path_effects=[pe.withStroke(linewidth=8, foreground='white')],label='dv/v trend')
+    
+
+ax[0].set_ylim(ylimdvv)
+ax[0].axhline(y=0, color='black', linestyle=':', linewidth=2)
+ax[0].set_ylabel('$less\ water$        $more\ water$\ndv/v (%)', fontsize=sz, color='tab:blue')
+ax[0].yaxis.label.set_color('tab:blue')  # Match Y-axis label color to plot color
+ax[0].tick_params(axis='y', labelcolor='tab:blue', labelsize=sz)
+ax[0].invert_yaxis()  # Flip the Y-axis
+ax[0].grid()
+
+# Secondary Y-axis for runoff
+ax0b = ax[0].twinx()
+ax0b.plot(runoff_km15['time'], (runoff_km15['moving_mean'] * 1000) / 3, color='tab:red')
+ax0b.set_ylabel('modelled surface\nrunoff (mm/hr)', fontsize=sz, color='tab:red')
+ax0b.yaxis.label.set_color('tab:red')  # Match Y-axis label color to plot color
+ax0b.tick_params(axis='y', labelcolor='tab:red', labelsize=sz)
+ax0b.set_ylim(0,3.75)
+
+# third y axis for GHT 
+GHT_file = './GHT_signal_CSVs/SE15_GHT_3-10_data.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+
+ax0c = ax[0].twinx()
+ax0c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+ax0c.set_ylabel('SE15 GHT (m/s)',fontsize=sz,color='k') # (dB rel. 1 $m^2$/$s^2$)
+ax0c.tick_params(axis='y',labelsize=sz,color='k')
+ax0c.set_ylim(ght_lims)
+ax0b.spines['right'].set_position(("axes", 1.05))
+ax0b.yaxis.get_offset_text().set_fontsize(sz-4)
+ax0b.yaxis.get_offset_text().set_x(1.1)
+
+
+# extra for the last bit of the record
+# third y axis for GHT 
+GHT_file = './GHT_signal_CSVs/SE15_GHT_3-10_data_2025.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+ax0c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+
+# extra for 2024-2025 
+GHT_file = './GHT_signal_CSVs/SE15_GHT_3-10_data_SEP_2025.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+ax0c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+
+# # extra: SW14 for 2024-2025 
+# GHT_file = './GHT_signal_CSVs/SW14_GHT_3-10_data_SEP_2025.csv'
+# GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+# GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+# ax0c.plot(GHT_data['t'],GHT_data['moving_mean'],color='c')
+
+# Adjust the X-axis labels and ticks
+ax[0].xaxis.set_major_locator(mdates.MonthLocator([1,4,7,10]))
+ax[0].xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))  # Format ticks as "Month Year"
+ax[0].set_xlim(pd.to_datetime(x_axis_limits_all))
+ax[0].tick_params(axis='x', labelsize=sz)
+# ax[0].xaxis.set_ticks_position('top')  # Move X-axis ticks to the top
+# ax[0].xaxis.set_label_position('top')  # Move X-axis label to the top
+#plt.setp(ax[0].xaxis.get_majorticklabels(), rotation=45, ha="left")
+ax[0].set_title('Reservoir zone - km 15',fontsize=fs_title)
+
+# velocity upper glacier
+velocity_file_km15 = './timeseries_data/forYoram_2025/SK_velocity_timeseries_A.csv'
+# velocity_file_km15 = './timeseries_data/SK_updated_velocity_timeseries_werror_15km.csv'  # New CSV file for velocity data
+velocity_data = load_velocity(velocity_file_km15)
+
+ax[1].scatter(velocity_data['t'],velocity_data['moving_mean'],color='k')
+ax[1].set_ylabel('ice velocity\n(m/day)',fontsize=sz)
+ax[1].set_xlim(pd.to_datetime(x_axis_limits_all))
+ax[1].set_ylim(vlims)
+ax[1].tick_params(axis='y', labelsize=sz)
+ax[1].grid()
+ax[1].set_yticks([0,10,20])
+
+#% inset axis 
+# inset Axes....
+# x1, x2, y1, y2 = pd.to_datetime('2024-01-10'), pd.to_datetime('2024-08-01'), 0, 5.5   # subregion of the original image
+# axins = ax[1].inset_axes(
+#     [0.62, 0.3, 0.27, 0.75],
+#     xlim=(x1, x2), ylim=(y1, y2), xticklabels=[])
+# axins.scatter(velocity_data['t'],velocity_data['moving_mean'],color='k')
+# axins.grid()
+# axins.tick_params(axis='y',labelsize=sz-5)
+# ax[1].indicate_inset_zoom(axins, edgecolor="black",linewidth=2)
+
+
+#% middle glacier 
+# add station
+trend_parts = []  
+sp = 'SW7_SE9_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=9)
+ax[2].scatter(raw_dates, raw_data, s=220, c='tab:blue', alpha=cc_normalized,label=sp)
+trend_parts.append(pd.Series(np.asarray(raw_data, dtype=float), index=pd.to_datetime(raw_dates)))
+
+#ax[2].plot(raw_dates,dvvc)
+# add station
+# if plot_extra_stations:
+sp = 'SW8_SE9_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+    raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=9)
+ax[2].scatter(raw_dates[15:], raw_data[15:], s=220, c='tab:purple', alpha=cc_normalized,label=sp)
+trend_parts.append(pd.Series(np.asarray(raw_data, dtype=float), index=pd.to_datetime(raw_dates)))
+
+if add_dotted_line:
+    # combine stations
+    s = pd.concat(trend_parts).sort_index()
+    s = s.groupby(s.index).mean()          
+
+    gap = s.index.to_series().diff()
+    after_gap = gap.idxmax()
+    s.loc[after_gap - pd.Timedelta('1ns')] = np.nan
+    s = s.sort_index()
+
+    ax[2].plot(s.index, s.rolling('30D').mean(),
+        ':', color='k', lw=4, zorder=10,
+        path_effects=[pe.withStroke(linewidth=8, foreground='white')], label='dv/v trend')
+
+# add the 2024-2025 data 
+sp = 'SW8_SE9_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle_Sep25,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle_Sep25,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvvc = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=15)
+ax[2].scatter(raw_dates, raw_data, s=220, c='tab:purple', alpha=cc_normalized)
+if add_dotted_line:
+    s = pd.Series(np.asarray(raw_data, dtype=float),
+              index=pd.to_datetime(raw_dates)).sort_index()
+
+    gap = s.index.to_series().diff()
+    after_gap = gap.idxmax()                      
+    s.loc[after_gap - pd.Timedelta('1ns')] = np.nan
+    s = s.sort_index()
+
+    # ax[0].plot(s.index, s.rolling(window=30).mean(), '--', c='tab:blue', lw=3)
+    ax[2].plot(s.index, s.rolling(window='30D',min_periods=8).mean(),
+        ':', color='k', lw=4,  zorder=10, path_effects=[pe.withStroke(linewidth=8, foreground='white')])
+    
+
+ax[2].legend(fontsize=14)
+
+ax[2].set_ylim(ylimdvv)
+ax[2].axhline(y=0, color='black', linestyle=':', linewidth=2)
+ax[2].set_ylabel('$less\ water$        $more\ water$\ndv/v (%)', fontsize=sz, color='tab:blue')
+ax[2].yaxis.label.set_color('tab:blue')  # Match Y-axis label color to plot color
+ax[2].tick_params(axis='y', labelcolor='tab:blue', labelsize=sz)
+ax[2].invert_yaxis()  # Flip the Y-axis
+ax[2].grid()
+
+# Secondary Y-axis for runoff
+ax1b = ax[2].twinx()
+ax1b.plot(runoff_km7['time'], (runoff_km7['moving_mean'] * 1000) / 3, color='tab:red')
+ax1b.set_ylabel('modelled surface\nrunoff (mm/hr)', fontsize=sz, color='tab:red')
+ax1b.yaxis.label.set_color('tab:red')  # Match Y-axis label color to plot color
+ax1b.tick_params(axis='y', labelcolor='tab:red', labelsize=sz)
+ax1b.set_ylim(0,3.75)
+
+# third y axis for GHT 
+GHT_file = './GHT_signal_CSVs/SE9_GHT_3-10_data.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+
+ax1c = ax[2].twinx()
+ax1c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+ax1c.set_ylabel('SE9 GHT (m/s)',fontsize=sz,color='k')
+ax1c.tick_params(axis='y',labelsize=sz,color='k')
+ax1c.set_ylim(ght_lims)
+ax1b.spines['right'].set_position(("axes", 1.05))
+ax1b.yaxis.get_offset_text().set_fontsize(sz-4)
+ax1b.yaxis.get_offset_text().set_x(1.1)
+
+# extra for the last bit of the record
+# third y axis for GHT 
+GHT_file = './GHT_signal_CSVs/SE9_GHT_3-10_data_2025.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+ax1c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+
+# extra for 2024-2025
+GHT_file = './GHT_signal_CSVs/SE9_GHT_3-10_data_SEP_2025.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+ax1c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+
+
+# Adjust the X-axis labels and ticks
+ax[2].xaxis.set_major_locator(mdates.MonthLocator([1,4,7,10]))
+ax[2].xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))  # Format ticks as "Month Year"
+ax[2].set_xlim(pd.to_datetime(x_axis_limits_all))
+ax[2].tick_params(axis='x', labelsize=sz)
+# ax[1].xaxis.set_ticks_position('top')  # Move X-axis ticks to the top
+# ax[1].xaxis.set_label_position('top')  # Move X-axis label to the top
+plt.setp(ax[1].xaxis.get_majorticklabels(), rotation=45, ha="left")
+ax[2].set_title('Reservoir zone - km 8',fontsize=fs_title)
+
+# velocity middle glacier
+velocity_file_km7 = './timeseries_data/forYoram_2025/SK_velocity_timeseries_C.csv'
+#velocity_file_km7 =  './timeseries_data/SK_velocity_timeseries_filtered_7km.csv' 
+velocity_data = load_velocity(velocity_file_km7)
+ax[3].scatter(velocity_data['t'],velocity_data['moving_mean'],color='k')
+ax[3].set_ylabel('ice velocity\n(m/day)',fontsize=sz)
+ax[3].set_xlim(pd.to_datetime(x_axis_limits_all))
+ax[3].set_ylim(vlims)
+ax[3].tick_params(axis='y', labelsize=sz)
+ax[3].grid()
+ax[3].set_yticks([0,10,20])
+
+
+#% lower glacier 
+trend_parts = []  
+# 
+sp = 'SW2_SE4_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvv_c = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=4)
+ax[4].scatter(raw_dates, raw_data, s=220, c='tab:purple', alpha=cc_normalized,label=sp)
+trend_parts.append(pd.Series(np.asarray(raw_data, dtype=float), index=pd.to_datetime(raw_dates)))
+
+if plot_extra_stations:
+    sp = 'SW2_SE2R_s'
+    if channel=='avg':
+        channels =['HHE','HHN','HHZ']
+        raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+    else:
+        data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+    cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+    if correct_seasonal_dvv:
+        raw_data,dvv_c = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=4)
+    ax[4].scatter(raw_dates, raw_data, s=220, c='tab:green', alpha=cc_normalized,label=sp)
+
+
+sp = 'SW2_SE7_s'
+if channel=='avg':
+    channels =['HHE','HHN','HHZ']
+    raw_data, raw_dates, cc = average_components(sp, channels, direc_pickle,window_size=window_size,cc_threshold=cc_threshold)
+else:
+    data,dates,m_data,m_dates,raw_data,raw_dates,cc = load_dvv(direc_pickle,sp,channel,window_size,cc_threshold)
+cc_normalized = (cc - np.min(cc)) / (np.max(cc) - np.min(cc))
+if correct_seasonal_dvv:
+      raw_data,dvv_c = seasonal_dvv_correction(raw_dates,raw_data,snowmasskm=4)
+ax[4].scatter(raw_dates, raw_data, s=220, c='tab:blue', alpha=cc_normalized,label=sp)
+trend_parts.append(pd.Series(np.asarray(raw_data, dtype=float), index=pd.to_datetime(raw_dates)))
+
+if add_dotted_line:
+    # cobine the two lines
+    s = pd.concat(trend_parts).sort_index()
+    s = s.groupby(s.index).mean()          # if two values at saame time, take average of the two
+
+    # break the line if there is a big gap
+    gap = s.index.to_series().diff()
+    after_gap = gap.idxmax()
+    s.loc[after_gap - pd.Timedelta('1ns')] = np.nan
+    s = s.sort_index()
+
+    ax[4].plot(s.index, s.rolling('30D',min_periods=8).mean(),
+        ':', color='k', lw=4, zorder=10,
+        path_effects=[pe.withStroke(linewidth=8, foreground='white')], label='dv/v trend')
+
+#ax[4].plot(raw_dates,dvv_c)
+
+ax[4].set_ylim(ylimdvv)
+ax[4].axhline(y=0, color='black', linestyle=':', linewidth=2)
+ax[4].set_ylabel('$less\ water$        $more\ water$\ndv/v (%)', fontsize=sz, color='tab:blue')
+ax[4].yaxis.label.set_color('tab:blue')  # Match Y-axis label color to plot color
+ax[4].tick_params(axis='y', labelcolor='tab:blue', labelsize=sz)
+ax[4].invert_yaxis()  # Flip the Y-axis
+ax[4].grid()
+
+# Secondary Y-axis for runoff
+ax2b = ax[4].twinx()
+line, = ax2b.plot(runoff_km2['time'], (runoff_km2['moving_mean'] * 1000) / 3, color='tab:red')
+ax2b.set_ylabel('modelled surface\nrunoff (mm/hr)', fontsize=sz, color='tab:red')
+ax2b.yaxis.label.set_color('tab:red')  # Match Y-axis label color to plot color
+ax2b.tick_params(axis='y', labelcolor='tab:red', labelsize=sz)
+ax2b.set_ylim(0,3.75)
+
+# ax[4].legend(fontsize=14)
+# Get handles from both axes and put legend on ax2b with high zorder
+handles1, labels1 = ax[4].get_legend_handles_labels()
+handles2, labels2 = ax2b.get_legend_handles_labels()
+
+leg = ax2b.legend(
+    handles1 + handles2,
+    labels1  + labels2,
+    fontsize=14,
+    loc="upper right",
+)
+leg.set_zorder(20)
+leg.get_frame().set_alpha(0.9)
+
+
+# Remove legend from ax[4] if it was already set
+ax[4].get_legend().remove() if ax[4].get_legend() else None
+
+# third y axis for GHT 
+GHT_file = './GHT_signal_CSVs/SW2_GHT_3-10_data.csv'
+GHT_data = pd.read_csv(GHT_file,parse_dates=['t'],dayfirst=False)
+GHT_data['moving_mean'] = GHT_data['GHT_Tamp'].rolling(window=48*window_size).mean()
+
+ax2c = ax[4].twinx()
+ax2c.plot(GHT_data['t'],GHT_data['moving_mean'],color='k')
+ax2c.set_ylabel('SW2 GHT (m/s)',fontsize=sz,color='k')
+ax2c.tick_params(axis='y',labelsize=sz,color='k')
+ax2c.set_ylim(ght_lims)
+ax2b.spines['right'].set_position(("axes", 1.05))
+ax2b.yaxis.get_offset_text().set_fontsize(sz-4)
+ax2b.yaxis.get_offset_text().set_x(1.1)
+
+# Adjust the X-axis labels and ticks
+ax[4].xaxis.set_major_locator(mdates.MonthLocator([1,4,7,10]))
+ax[4].xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))  # Format ticks as "Month Year"
+ax[4].set_xlim(pd.to_datetime(x_axis_limits_all))
+# ax[2].xaxis.set_ticks_position('top')  # Move X-axis ticks to the top
+# ax[2].xaxis.set_label_position('top')  # Move X-axis label to the top
+ax[4].set_title('Receiving zone - km 3',fontsize=fs_title)
+
+velocity_file_km2 = './timeseries_data/forYoram_2025/SK_velocity_timeseries_E.csv'
+velocity_data = load_velocity(velocity_file_km2)
+ax[5].scatter(velocity_data['t'],velocity_data['moving_mean'],color='k')
+ax[5].set_ylabel('ice velocity\n(m/day)',fontsize=sz)
+ax[5].set_xlim(pd.to_datetime(x_axis_limits_all))
+ax[5].set_ylim(vlims)
+ax[5].tick_params(axis='y', labelsize=sz)
+ax[5].grid()
+ax[5].set_yticks([0,10,20])
+ax[5].tick_params(axis='x', labelsize=fs_title)
+
+# # Extra spacing value
+extra_spacing = 0.017  # Adjust this value for more/less space
+
+# # Apply extra spacing after every second subplot (ax[1], ax[3], ax[5])
+for i in [1, 3, 5]:  
+    pos = ax[i].get_position()  # Get current position
+    ax[i].set_position([pos.x0, pos.y0 + extra_spacing, pos.width, pos.height])  # Move downward
+
+
+for i, a in enumerate(ax):
+    if i in [1, 3, 5]:
+        a.tick_params(labelbottom=True,labelsize=sz,rotation=-20)
+    else:
+        a.tick_params(labelbottom=False)
+
+dates = runoff_km15['time']
+for year in range(dates.min().year, dates.max().year + 1):
+    january_first = pd.Timestamp(f"{year}-01-01")
+    if january_first >= dates.min() and january_first <= dates.max():
+        for axi in ax:
+            axi.axvline(
+                mdates.date2num(january_first),
+                color="black",
+                linewidth=1.5,
+                alpha=0.8
+            )
+            
+
+plt.setp(ax[5].xaxis.get_majorticklabels(), rotation=-22, ha="left")
+plt.setp(ax[1].xaxis.get_majorticklabels(), rotation=-22, ha="left")
+plt.setp(ax[3].xaxis.get_majorticklabels(), rotation=-22, ha="left")
+
+# Plot on each subplot and add a letter
+letters = ['a', 'b', 'c', 'd','e','f']
+for ax, letter in zip(ax.flatten(), letters):
+    # Add a letter to the top-left corner of each subplot
+    ax.text(0.01, 0.98, letter, transform=ax.transAxes, fontsize=sz+2, fontweight='bold', verticalalignment='top')
+
+plt.savefig('timeseries_v9_with_dots.png',dpi=300,bbox_inches='tight', pad_inches=0.1)
+#%%
+
