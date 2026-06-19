@@ -8,3 +8,4 @@ The workflow used here is also heavily inspired by one of the working example no
 - Run noise_correlation_only.py: performs the cross correlation for the station pairs. Best run from the command line.
 - Run dv_v_script.py Performs the dvv computations, plots figures, and saves csvs for more plotting. Best run as a notebook.
 - Script_for_main_figure.py can be used to re-create figure 3 in the paper. This calls on the functions in helpers that implement the averaging and snow corrections.
+- plot_synthetic_dispersion can be used to reproduce the experiments identifying a frequency range reflecting change near the bed.
